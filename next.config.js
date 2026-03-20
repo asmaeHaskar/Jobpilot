@@ -1,11 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable cacheComponents for better performance
-  cacheComponents: false,
-  
-  // Turbopack configuration
-  experimental: {
-    // Remove deprecated option
+  // Turbopack root configuration
+  turbopack: {
+    root: './',
   },
 
   // Logging configuration
