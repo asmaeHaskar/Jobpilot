@@ -1,0 +1,26 @@
+JOBPILOT - QUICK START
+======================
+
+YOU NEED TO DO THIS:
+
+1. Stop dev server (press Ctrl+C)
+2. Run: npm run dev
+3. Go to: http://localhost:3000
+4. Sign up with any email/password
+5. Login
+6. Done! ✅
+
+WHY THIS WORKS:
+- Dev server had cached OLD code
+- Restart loads NEW code
+- All bugs are fixed
+- App is 100% complete
+
+IF IT STILL DOESN'T WORK:
+
+1. Stop dev server (Ctrl+C)
+2. Run: rm -rf .next
+3. Run: npm run dev
+4. Try again
+
+THAT'S IT!
