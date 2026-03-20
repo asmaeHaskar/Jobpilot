@@ -8,31 +8,32 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { Empty } from '@/components/ui/empty'
-import { DeleteIcon, DownloadIcon, PlusIcon, CheckIcon, StarIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { DeleteIcon, DownloadIcon, PlusIcon, FileIcon, BriefcaseIcon } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function CVsPage() {
   const router = useRouter()
+  const { user, isAuthenticated } = useAuth()
   const [loading, setLoading] = useState(true)
   const [cvs, setCvs] = useState<any[]>([])
   const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
-    loadCVs()
-  }, [router])
+    if (isAuthenticated && user) {
+      loadCVs()
+    }
+  }, [isAuthenticated, user])
 
   const loadCVs = async () => {
-    const session = await supabase.auth.getSession()
-    if (!session.data.session) {
-      router.push('/auth/login')
-      return
-    }
+    if (!user) return
 
     try {
       const { data, error } = await supabase
         .from('cvs')
         .select('*')
-        .eq('user_id', session.data.session.user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -47,7 +48,7 @@ export default function CVsPage() {
   }
 
   const handleDelete = async (cvId: string) => {
-    if (!confirm('Are you sure you want to delete this CV?')) return
+    if (!confirm('Are you sure you want to delete this CV? This will also delete all job matches associated with it.')) return
 
     setDeleting(cvId)
     try {
@@ -65,28 +66,9 @@ export default function CVsPage() {
     }
   }
 
-  const handleSetPrimary = async (cvId: string) => {
-    try {
-      const session = await supabase.auth.getSession()
-      const userId = session.data.session?.user.id
-
-      // Remove primary from all CVs
-      await supabase.from('cvs').update({ is_primary: false }).eq('user_id', userId)
-
-      // Set as primary
-      const { error } = await supabase
-        .from('cvs')
-        .update({ is_primary: true })
-        .eq('id', cvId)
-
-      if (error) throw error
-
-      // Update local state
-      setCvs(cvs.map((cv) => ({ ...cv, is_primary: cv.id === cvId })))
-      toast.success('Primary CV updated')
-    } catch (error) {
-      console.error('Error setting primary CV:', error)
-      toast.error('Failed to update primary CV')
+  const downloadCV = (cv: any) => {
+    if (cv.file_url) {
+      window.open(cv.file_url, '_blank')
     }
   }
 
@@ -103,7 +85,7 @@ export default function CVsPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">My CVs</h1>
-          <p className="text-muted-foreground">Upload and manage your resumes</p>
+          <p className="text-muted-foreground">Upload and manage your resumes for job matching</p>
         </div>
         <Link href="/dashboard/cvs/upload">
           <Button className="gap-2">
@@ -116,10 +98,10 @@ export default function CVsPage() {
       {cvs.length === 0 ? (
         <Empty
           title="No CVs uploaded yet"
-          description="Upload your first CV to get started with job matching and applications."
+          description="Upload your first CV to get started with AI-powered job matching and personalized applications."
           action={
             <Link href="/dashboard/cvs/upload">
-              <Button>Upload CV</Button>
+              <Button>Upload Your CV</Button>
             </Link>
           }
         />
@@ -128,32 +110,28 @@ export default function CVsPage() {
           {cvs.map((cv) => (
             <Card key={cv.id} className="hover:border-primary/50 transition">
               <CardHeader className="pb-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-3">
-                      <CardTitle>{cv.filename}</CardTitle>
-                      {cv.is_primary && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                          <StarIcon className="w-3 h-3" />
-                          Primary
-                        </div>
-                      )}
+                      <div className="rounded-lg bg-muted p-2">
+                        <FileIcon className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{cv.file_name}</CardTitle>
+                        <CardDescription>
+                          Uploaded {new Date(cv.created_at).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
                     </div>
-                    <CardDescription>
-                      Uploaded {new Date(cv.created_at).toLocaleDateString()}
-                    </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    {!cv.is_primary && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSetPrimary(cv.id)}
-                      >
-                        <StarIcon className="w-4 h-4 mr-1" />
-                        Set as Primary
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadCV(cv)}
+                    >
+                      <DownloadIcon className="w-4 h-4" />
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"
@@ -170,23 +148,54 @@ export default function CVsPage() {
                 </div>
               </CardHeader>
 
-              {cv.extracted_skills && cv.extracted_skills.length > 0 && (
-                <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm font-medium mb-2">Extracted Skills</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Experience</p>
+                    <p className="text-2xl font-bold">
+                      {cv.experience?.years || 0} <span className="text-sm font-normal text-muted-foreground">years</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Skills</p>
+                    <p className="text-2xl font-bold">
+                      {cv.skills?.length || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Education</p>
+                    <p className="text-2xl font-bold">
+                      {cv.education ? '✓' : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {cv.skills && cv.skills.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <BriefcaseIcon className="w-4 h-4" />
+                      Top Skills
+                    </p>
                     <div className="flex flex-wrap gap-2">
-                      {cv.extracted_skills.map((skill: string) => (
-                        <div
-                          key={skill}
-                          className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
-                        >
+                      {cv.skills.slice(0, 8).map((skill: string, i: number) => (
+                        <Badge key={i} variant="secondary">
                           {skill}
-                        </div>
+                        </Badge>
                       ))}
+                      {cv.skills.length > 8 && (
+                        <Badge variant="outline">+{cv.skills.length - 8}</Badge>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              )}
+                )}
+
+                <Button
+                  className="w-full mt-2"
+                  onClick={() => router.push('/dashboard/jobs')}
+                >
+                  View Matched Jobs
+                </Button>
+              </CardContent>
             </Card>
           ))}
         </div>
