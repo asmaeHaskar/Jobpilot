@@ -30,6 +30,20 @@ export default function Dashboard() {
       const userId = session.data.session.user.id
 
       try {
+        // First check if tables exist by trying to read from profiles
+        const { error: checkError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .limit(1)
+
+        // If tables don't exist, redirect to init
+        if (checkError?.code === 'PGRST116' || checkError?.message?.includes('does not exist')) {
+          console.log('[v0] Tables not found, redirecting to init...')
+          router.push('/dashboard/init')
+          return
+        }
+
         // Get CV count
         const { count: cvCount } = await supabase
           .from('cvs')
@@ -54,7 +68,12 @@ export default function Dashboard() {
           matchCount: matchCount || 0,
         })
       } catch (error) {
-        console.error('Error loading stats:', error)
+        console.error('[v0] Error loading stats:', error)
+        // If there's an error, try to initialize
+        if (error instanceof Error && error.message.includes('does not exist')) {
+          router.push('/dashboard/init')
+          return
+        }
       } finally {
         setLoading(false)
       }

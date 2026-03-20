@@ -21,35 +21,24 @@ export default function SignUp() {
     setLoading(true)
 
     try {
-      // Sign up the user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
+      // Call our signup API
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+        }),
       })
 
-      if (error) throw error
+      const data = await response.json()
 
-      // Create profile
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              email,
-              full_name: fullName,
-            },
-          ])
-
-        if (profileError) throw profileError
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sign up')
       }
 
-      toast.success('Account created! Please check your email to confirm.')
+      toast.success('Account created successfully!')
       router.push('/auth/login')
     } catch (error) {
       console.error('Signup error:', error)
